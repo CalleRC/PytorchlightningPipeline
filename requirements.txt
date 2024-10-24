@@ -1,0 +1,7 @@
+torch
+torchvision
+torchaudio
+
+lightning
+pytorch-lightning
+pytorch-optimizer

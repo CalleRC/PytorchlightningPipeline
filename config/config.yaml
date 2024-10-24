@@ -1,0 +1,53 @@
+identifier:
+  name: train
+  time_format: "%m%d" # datatime.strftime format
+
+logging:
+  dir: out/logs
+  log_every_n_steps: 1
+  log_gradients: # Log the mean and max gradient. Loops through all parameters so use with caution
+    use: false
+    step_type: epoch # batch, epoch
+    every_n: 1
+
+checkpointing:
+  dir: out/checkpoints
+  save_top_k: 5
+  mode: min # min or max
+
+training:
+  accelerator: auto
+  epochs: 1000
+  precision: 32-true # 16-mixed, 16-true ect. See pytorch lightning docs
+  accumulated_grad_batches: 1
+  gradient_clipping:
+    use: false
+    value: 0.0
+    algorithm: "norm" # norm or value
+
+trainmodule:
+  loss_functions:
+    - name: placeholdername
+      target: losses.PlaceholderLoss
+      weight: 1.0
+    # - name: xxx, define more if needed
+  optimizer:
+    optimizer: "adan" # adam, adan, sgd, etc.
+    weight_decay: 1e-4
+    lr_half_period: 2000
+    lr_mult_period: 2
+    lr_min: 1e-4
+    lr_max: 1e-2
+    lr_warmup_period: 1000
+    lr_warmup_max: 4e-2
+
+dataset:
+  target: dataset.SomeDataset
+  # other paramters that should be passed to the dataset
+
+dataloader:
+  batch_size: 32
+  persistent_workers: false
+  num_workers: -1 # if -1 then os.cpu_count()
+  val_worker_ratio: 0.1
+  pin_memory: false
