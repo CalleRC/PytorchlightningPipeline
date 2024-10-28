@@ -27,6 +27,9 @@ class TrainModule(L.LightningModule):
         self.optimizer_params = optimizer_params
         
         self.save_hyperparameters(ignore=['model'])
+        
+    def forward(self, x):
+        return self.model(x)
 
     def training_step(self, batch, batch_idx) -> torch.Tensor:
 
@@ -43,7 +46,7 @@ class TrainModule(L.LightningModule):
     
     def validation_step(self, batch : tuple, batch_idx) -> torch.Tensor:
 
-        outputs = self.model(...)
+        outputs = self.model(batch)
 
         losses = self._get_losses(outputs, batch)
         
@@ -61,19 +64,19 @@ class TrainModule(L.LightningModule):
         #  because super scheduler mutates the initial learning rate.
         lr_cosine = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
             optimizer=optimizer,
-            T_0=self.optimizer_params.lr_half_period,
-            T_mult=self.optimizer_params.lr_mult_period,
-            eta_min=self.optimizer_params.lr_min
+            T_0=int(self.optimizer_params.lr_half_period),
+            T_mult=int(self.optimizer_params.lr_mult_period),
+            eta_min=float(self.optimizer_params.lr_min)
         )
         lr_super = torch.optim.lr_scheduler.OneCycleLR(
             optimizer=optimizer,
-            max_lr=self.optimizer_params.lr_warmup_max,
-            total_steps=self.optimizer_params.lr_warmup_period,
+            max_lr=float(self.optimizer_params.lr_warmup_max),
+            total_steps=int(self.optimizer_params.lr_warmup_period),
         )
         lr_scheduler = torch.optim.lr_scheduler.SequentialLR(
             optimizer=optimizer,
             schedulers=[lr_super, lr_cosine], # type: ignore
-            milestones=[self.optimizer_params.lr_warmup_period],
+            milestones=[int(self.optimizer_params.lr_warmup_period)],
         )
         
         return lr_scheduler
@@ -82,8 +85,8 @@ class TrainModule(L.LightningModule):
         optimizer = create_optimizer(
             self.model, # type: ignore
             self.optimizer_params.optimizer,
-            lr=self.optimizer_params.lr_max,
-            weight_decay=self.optimizer_params.weight_decay,
+            lr=float(self.optimizer_params.lr_max),
+            weight_decay=float(self.optimizer_params.weight_decay),
             use_lookahead=True,
             use_gc=True,
             eps=1e-6
@@ -108,20 +111,20 @@ class TrainModule(L.LightningModule):
     
     def _get_losses(self, outputs : list[torch.Tensor], batch : list[torch.Tensor]) -> list[torch.Tensor]:
         
-        losses = []
+        losses = torch.zeros(len(self.loss_functions))
         
-        for weight, loss_func in zip(self.loss_weights, self.loss_functions):
-            loss = loss_func(outputs, batch) * weight
-            losses.append(loss)
+        for i, (weight, loss_func) in enumerate(zip(self.loss_weights, self.loss_functions)):
+            losses[i] = loss_func(outputs, batch) * weight
             
         return losses
         
-    def _log_losses(self, losses : dict[str, torch.Tensor], subdir : str):
+    def _log_losses(self, losses : torch.Tensor, subdir : str):
         """
         Log the losses to the logger
         """
-        for key, value in losses.items():
-            self.log(f"{subdir}/{key}", value, on_epoch=True, on_step=False)
+        for func, loss in zip(self.loss_functions, losses):
+            name = func.__class__.__name__
+            self.log(f"{subdir}/{name}", loss, on_epoch=True, on_step=False)
 
     def _log_predictions(self, batch, outputs, prefix : str):
         """

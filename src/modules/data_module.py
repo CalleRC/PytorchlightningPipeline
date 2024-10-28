@@ -1,7 +1,9 @@
 
-from lightning import LightningDataModule
-from torch.utils.data import DataLoader
+import os
 from types import SimpleNamespace as NameSpace
+
+from torch.utils.data import DataLoader
+from lightning import LightningDataModule
 
 class DataModule(LightningDataModule):
     
@@ -17,8 +19,13 @@ class DataModule(LightningDataModule):
         
         self.dataloader_params = dataloader_params
 
-        self.train_dataset = dataset(dataset_params, is_train = True)
-        self.val_dataset = dataset(dataset_params, is_train = False)
+        self.train_dataset = dataset(**vars(dataset_params), is_train = True)
+        self.val_dataset = dataset(**vars(dataset_params), is_train = False)
+
+        if dataloader_params.num_workers == -1:
+            dataloader_params.num_workers = os.cpu_count()
+        assert dataloader_params.num_workers > 1, f"Number of workers should be -1 (auto) or > 1 (least 1 for validation and 1 for training). \
+                                                   Currently; {dataloader_params.num_workers}"
 
         self.val_workers = max(1,int(dataloader_params.num_workers*dataloader_params.val_worker_ratio))
         self.train_workers = dataloader_params.num_workers - self.val_workers

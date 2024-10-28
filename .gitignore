@@ -5,3 +5,5 @@ data/*
 out/*
 !out/.gitkeep
 
+# pycache
+__pycache__/

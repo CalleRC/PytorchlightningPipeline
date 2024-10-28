@@ -16,20 +16,20 @@ checkpointing:
   mode: min # min or max
 
 training:
-  accelerator: auto
+  accelerator: auto # cpu, gpu, tpu, hpu, mps, auto
   epochs: 1000
   precision: 32-true # 16-mixed, 16-true ect. See pytorch lightning docs
-  accumulated_grad_batches: 1
+  accumulate_grad_batches: 1
   gradient_clipping:
     use: false
     value: 0.0
     algorithm: "norm" # norm or value
 
-trainmodule:
   loss_functions:
-    - name: placeholdername
-      target: losses.PlaceholderLoss
+    - target: src.losses.placeholder_loss.PlaceholderLoss
       weight: 1.0
+      params:
+        dummy: none # replace with whatever parameters are needed
     # - name: xxx, define more if needed
   optimizer:
     optimizer: "adan" # adam, adan, sgd, etc.
@@ -42,8 +42,11 @@ trainmodule:
     lr_warmup_max: 4e-2
 
 dataset:
-  target: dataset.SomeDataset
-  # other paramters that should be passed to the dataset
+  target: src.dataset.placeholder_dataset.PlaceholderDataset
+  params:
+    param_a: 1
+    param_b: 2
+    # other paramters that should be passed to the dataset
 
 dataloader:
   batch_size: 32

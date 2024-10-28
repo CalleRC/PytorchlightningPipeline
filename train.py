@@ -12,7 +12,6 @@ from src.modules.data_module import DataModule
 from src.utils.misc import dict_to_namespace
 from src.callbacks.gradient_callback import GradientLoggerCallback
 
-import config
 import yaml
 import importlib
 from pathlib import Path
@@ -20,42 +19,43 @@ from pathlib import Path
 from types import SimpleNamespace as NameSpace
 
 def import_target(target : str) -> any:
-    module_name, class_name = target.rsplit('.', 1)
-    module = importlib.import_module(module_name)
-    return getattr(module, class_name)
+    try:
+        module_name, class_name = target.rsplit('.', 1)
+        module = importlib.import_module(module_name)
+        return getattr(module, class_name)
+    except:
+        raise ImportError(f"Could not import target: {target}")
     
-def get_loss_functions(args : NameSpace) -> tuple[list[nn.Module], list[float]]:
+def get_loss_functions(params : NameSpace) -> tuple[list[nn.Module], list[float]]:
 
     weights = []
     functions = []
-    for info in  args.trainmodule.loss_functions.Values():
-        loss = import_target(info.target)
-        weights.append(loss(**vars(info.params)))
-        functions.append(info.weight)
+    for info in  params.training.loss_functions:
+        loss = import_target(info["target"])
+        functions.append(loss(**info["params"]))
+        weights.append(info["weight"])
         
     return functions, weights
 
-def get_model(args : NameSpace) -> nn.Module:
-    model = import_target(args.model.target)
-    return model(**vars(args.model.params))
-
-
+def get_model(model_params : NameSpace) -> nn.Module:
+    model = import_target(model_params.target)
+    return model(**vars(model_params.params))
 
 def train(params : NameSpace, model_params : NameSpace) -> None:
     
     # Define the dataset and the data module
     dataset = import_target(params.dataset.target)
     data_module = DataModule(dataset = dataset,
-                             dataset_params = params.dataset,
+                             dataset_params = params.dataset.params,
                              dataloader_params = params.dataloader)
     
     # Define the loss function, model, and training module
-    loss_functions, loss_weights = get_loss_functions(model_params)
+    loss_functions, loss_weights = get_loss_functions(params)
     model = get_model(model_params)
     train_module = TrainModule(model = model,
                                loss_functions = loss_functions,
                                loss_weights = loss_weights,
-                               optimizer_params = params.optimizer)
+                               optimizer_params = params.training.optimizer)
     
     suffix = datetime.datetime.now().strftime(params.identifier.time_format)
     identifier = f"{params.identifier.name}-{suffix}"
@@ -71,7 +71,7 @@ def train(params : NameSpace, model_params : NameSpace) -> None:
         dirpath=params.checkpointing.dir,
         filename=identifier,
         save_top_k=params.checkpointing.save_top_k,
-        mode=params.checkpointing.min,
+        mode=params.checkpointing.mode,
     )
     
     callbacks = [lr_monitor, checkpoint_callback]
@@ -89,7 +89,7 @@ def train(params : NameSpace, model_params : NameSpace) -> None:
         gradient_clip_val = None
         gradient_clip_algorithm = None
     
-    trainer = L.Trainer(accelerator=params.accelerator,
+    trainer = L.Trainer(accelerator=params.training.accelerator,
                         callbacks=callbacks,
                         max_epochs=params.training.epochs,
                         log_every_n_steps=params.logging.log_every_n_steps,

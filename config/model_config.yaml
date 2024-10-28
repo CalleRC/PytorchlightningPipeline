@@ -1,2 +1,5 @@
 
-someParam: none
+target: model.placeholder_model.PlaceholderModel
+params:
+  param_a: 1
+  param_b: 2
